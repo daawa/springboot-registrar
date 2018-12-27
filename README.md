@@ -6,17 +6,17 @@
 
 ### ImportBeanDefinitionRegistrar
 
-Spring官方在动态注册bean时，大部分套路其实是使用**ImportBeanDefinitionRegistrar**接口。
+Spring官方在动态注册bean时，大部分套路其实是使用**`ImportBeanDefinitionRegistrar`**接口。
 
-所有实现了该接口的类的都会被**ConfigurationClassPostProcessor**处理，
+所有实现了该接口的类的都会被**`ConfigurationClassPostProcessor`**处理，
 
-**ConfigurationClassPostProcessor**实现了**BeanFactoryPostProcessor**接口，
+`ConfigurationClassPostProcessor`实现了**`BeanFactoryPostProcessor`**接口，
 
-所以**ImportBeanDefinitionRegistrar**中动态注册的bean是优先与依赖其的bean初始化的，也能被aop、validator等机制处理。
+所以`ImportBeanDefinitionRegistrar`中**动态注册的bean是优先于对其有依赖的bean初始化的**，也能被aop、validator等机制处理。
 
 ##### 使用方法
 
-**ImportBeanDefinitionRegistrar**需要配合@Configuration和@Import注解，@Configuration定义Java格式的Spring配置文件，@Import注解导入实现了**ImportBeanDefinitionRegistrar**接口的类。
+**`ImportBeanDefinitionRegistrar`**需要配合`@Configuration`和`@Import`注解，`@Configuration` 定义Java格式的Spring配置文件，`@Import` 注解导入实现了**`ImportBeanDefinitionRegistrar`**接口的类。
 
 例子：
 
