@@ -10,7 +10,6 @@ import org.springframework.stereotype.Component;
 /**
  * {@code @Component } 把此类/接口注册成一个{@link BeanDefinition}， 由于加了{@code @AutoReqProxy} 被HTTPRequestRegistrar中的 scanner 扫描
  */
-@Component
 @AutoReqProxy
 public interface IRequestDemo {
 
