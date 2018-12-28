@@ -1,8 +1,12 @@
+> 
+> `ImportBeanDefinitionRegistrar` 通过`@Import`应用在 注解了 `@Configuration` 的类上。
+>
+>  Interface to be implemented by types that register additional bean definitions when
+>  processing `@Configuration` classes. Useful when operating at the bean definition
+>  level (as opposed to `@Bean` method/instance level) is desired or necessary.
 
 
-### 动态注册bean，Spring官方套路：使用ImportBeanDefinitionRegistrar
-
-[上一篇文章][1]中介绍了Spring提供的动态注册bean的方法。这里会介绍一下Spring官方实现动态注册bean的套路。
+### 使用 `ImportBeanDefinitionRegistrar` 动态注册bean
 
 ### ImportBeanDefinitionRegistrar
 
@@ -16,173 +20,154 @@ Spring官方在动态注册bean时，大部分套路其实是使用**`ImportBean
 
 ##### 使用方法
 
-**`ImportBeanDefinitionRegistrar`**需要配合`@Configuration`和`@Import`注解，`@Configuration` 定义Java格式的Spring配置文件，`@Import` 注解导入实现了**`ImportBeanDefinitionRegistrar`**接口的类。
+**`ImportBeanDefinitionRegistrar`**需要配合`@Configuration`和`@Import`注解，
 
-例子：
+`@Configuration` 定义Java格式的Spring配置文件，
+
+`@Import` 应用在在注解了`@Configuration`的类上，可以导入 **`ImportBeanDefinitionRegistrar`** 接口的实现类。
+
+##### DEMO：实现类似 retrofit 的自动代理 bean
 
 要实现的效果如下，在接口上使用注解定义url、http方法类型等信息，程序根据这些信息动态生成实现类
 
 ```java
-    @Component
-    @HTTPUtil
-    public interface IRequestDemo {
-        //调用test1时，会对http://abc.com发送get请求
-        @HTTPRequest(url = "http://abc.com")
-
-        HttpResult<String> test1();
-        //调用test2时，会对http://test2.com发送post请求
-        @HTTPRequest(url = "http://test2.com", httpMethod = HTTPMethod.POST)
-        HttpResult<String> test2();
-    }
+@Component
+@AutoReqProxy
+public interface IRequestDemo {
+    @HTTPRequest(url = "http://abc.com")
+    HttpResult<String> test1();
+    
+    @HTTPRequest(url = "http://test2.com", httpMethod = HTTPMethod.POST)
+    HttpResult<String> test2();
+}
 ```
 
-例子思路来自于我的同事[晓风轻][2]的文章[《编写简陋的接口调用框架》][3]。
-
-此处为了简化，我并没有实现完整的http请求代理，而是把注意力集中到**ImportBeanDefinitionRegistrar**的实现上。
-
-对完整实现感兴趣的，可以参考项目[https://github.com/xwjie/MyRestUtil](http://link.zhihu.com/?target=https%3A//github.com/xwjie/MyRestUtil)
+ref: [https://github.com/xwjie/MyRestUtil](http://link.zhihu.com/?target=https%3A//github.com/xwjie/MyRestUtil)
 
 ##### 例子编写步骤
 
 1. 首先编写核心**ImportBeanDefinitionRegistrar**接口，重要代码如下：
     
-    主要思路是利用**ClassPathScanningCandidateComponentProvider**获取标注了**HTTPUtil**注解的接口，并使用JDK动态代理为期生成代理对象。然后使用**DefaultListableBeanFactory**将代理对象注册到容器中。如下：
+    主要思路是利用**`ClassPathScanningCandidateComponentProvider`**获取标注了**`@AutoReqProxy`**注解的接口，并使用 ***JDK动态代理*** 为其生成代理对象。
     
-    ```language-java
+    然后使用**`DefaultListableBeanFactory`**将代理对象注册到容器中。
+    
+    ```java
+    
+    /**
+     *  dynamically register beans for interfaces that annotated by @AutoReqProxy
+     */
     @Slf4j
-    public class HTTPRequestRegistrar implements ImportBeanDefinitionRegistrar, ResourceLoaderAware, BeanClassLoaderAware, EnvironmentAware, BeanFactoryAware {
-       @Override
-       public void registerBeanDefinitions(AnnotationMetadata annotationMetadata, BeanDefinitionRegistry beanDefinitionRegistry) {
-           registerHttpRequest(beanDefinitionRegistry);
-       }
+    public class AutoRequestProxyRegistrar implements ImportBeanDefinitionRegistrar, ResourceLoaderAware, BeanClassLoaderAware, EnvironmentAware, BeanFactoryAware {
     
-       /**
-        * 注册动态bean的主要方法
-        *
-        * @param beanDefinitionRegistry
-        */
-       private void registerHttpRequest(BeanDefinitionRegistry beanDefinitionRegistry) {
-           ClassPathScanningCandidateComponentProvider classScanner = getClassScanner();
-           classScanner.setResourceLoader(this.resourceLoader);
-           //指定只关注标注了@HTTPUtil注解的接口
-           AnnotationTypeFilter annotationTypeFilter = new AnnotationTypeFilter(HTTPUtil.class);
-           classScanner.addIncludeFilter(annotationTypeFilter);
-           //指定扫描的基础包
-           String basePack = "com.example.registerbean";
-           Set<BeanDefinition> beanDefinitionSet = classScanner.findCandidateComponents(basePack);
-           for (BeanDefinition beanDefinition : beanDefinitionSet) {
-               if (beanDefinition instanceof AnnotatedBeanDefinition) {
-                   registerBeans(((AnnotatedBeanDefinition) beanDefinition));
-               }
-           }
-       }
+        private ClassLoader    classLoader;
+        private ResourceLoader resourceLoader;
+        private Environment    environment;
+        private BeanFactory    beanFactory;
     
-       /**
-        * 创建动态代理，并动态注册到容器中
-        *
-        * @param annotatedBeanDefinition
-        */
-       private void registerBeans(AnnotatedBeanDefinition annotatedBeanDefinition) {
-           String className = annotatedBeanDefinition.getBeanClassName();
-           ((DefaultListableBeanFactory) this.beanFactory).registerSingleton(className, createProxy(annotatedBeanDefinition));
-       }
+        @Override
+        public void registerBeanDefinitions(AnnotationMetadata annotationMetadata, BeanDefinitionRegistry beanDefinitionRegistry) {
+            registerHttpRequest(beanDefinitionRegistry);
+        }
     
-       /**
-        * 构造Class扫描器，设置了只扫描顶级接口，不扫描内部类
-        *
-        * @return
-        */
-       private ClassPathScanningCandidateComponentProvider getClassScanner() {
-           return new ClassPathScanningCandidateComponentProvider(false, this.environment) {
+        /**
+         * @param beanDefinitionRegistry app-scope beanFactory
+         */
+        private void registerHttpRequest(BeanDefinitionRegistry beanDefinitionRegistry) {
+            ClassPathScanningCandidateComponentProvider classScanner = getClassScanner();
+            classScanner.setResourceLoader(this.resourceLoader);
     
-               @Override
-               protected boolean isCandidateComponent(
-                       AnnotatedBeanDefinition beanDefinition) {
-                   if (beanDefinition.getMetadata().isInterface()) {
-                       try {
-                           Class<?> target = ClassUtils.forName(
-                                   beanDefinition.getMetadata().getClassName(),
-                                   classLoader);
-                           return !target.isAnnotation();
-                       } catch (Exception ex) {
-                           log.error("load class exception:", ex);
-                       }
-                   }
-                   return false;
-               }
-           };
-       }
+            //only scan interfaces that annotated by @AutoReqProxy
+            AnnotationTypeFilter annotationTypeFilter = new AnnotationTypeFilter(AutoReqProxy.class);
     
-       /**
-        * 创建动态代理
-        *
-        * @param annotatedBeanDefinition
-        * @return
-        */
-       private Object createProxy(AnnotatedBeanDefinition annotatedBeanDefinition) {
-           try {
-               AnnotationMetadata annotationMetadata = annotatedBeanDefinition.getMetadata();
-               Class<?> target = Class.forName(annotationMetadata.getClassName());
-               InvocationHandler invocationHandler = createInvocationHandler();
-               Object proxy = Proxy.newProxyInstance(HTTPRequest.class.getClassLoader(), new Class[]{target}, invocationHandler);
-               return proxy;
-           } catch (ClassNotFoundException e) {
-               log.error(e.getMessage());
-           }
-           return null;
-       }
+            classScanner.addIncludeFilter(annotationTypeFilter);
+            String basePack = "com.registrar.demo";
+            Set<BeanDefinition> beanDefinitionSet = classScanner.findCandidateComponents(basePack);
     
-       /**
-        * 创建InvocationHandler，将方法调用全部代理给DemoHttpHandler
-        *
-        * @return
-        */
-       private InvocationHandler createInvocationHandler() {
-           return new InvocationHandler() {
-               private DemoHttpHandler demoHttpHandler = new DemoHttpHandler();
+            for (BeanDefinition beanDefinition : beanDefinitionSet) {
+                if (beanDefinition instanceof AnnotatedBeanDefinition) {
+                    registerBeans(((AnnotatedBeanDefinition) beanDefinition));
+                }
+            }
+        }
     
-               @Override
-               public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+        
+        private void registerBeans(AnnotatedBeanDefinition annotatedBeanDefinition) {
+            String className = annotatedBeanDefinition.getBeanClassName();
+            ((DefaultListableBeanFactory) this.beanFactory).registerSingleton(className, createProxy(annotatedBeanDefinition));
+        }
     
-                   return demoHttpHandler.handle(method);
-               }
-           };
-       }        
-        ... 省略setter代码   
+        /**
+         * 构造Class扫描器，设置了只扫描顶级接口，不扫描内部类
+         */
+        private ClassPathScanningCandidateComponentProvider getClassScanner() {
+            return new ClassPathScanningCandidateComponentProvider(false, this.environment) {
+    
+                @Override
+                protected boolean isCandidateComponent(AnnotatedBeanDefinition beanDefinition) {
+                    if (beanDefinition.getMetadata().isInterface()) {
+                        try {
+                            Class<?> target = ClassUtils.forName(beanDefinition.getMetadata().getClassName(), classLoader);
+                            return !target.isAnnotation();
+                        } catch (Exception ex) {
+                            log.error("load class exception:", ex);
+                        }
+                    }
+                    return false;
+                }
+            };
+        }
+    
+        
+        private Object createProxy(AnnotatedBeanDefinition annotatedBeanDefinition) {
+            try {
+                AnnotationMetadata annotationMetadata = annotatedBeanDefinition.getMetadata();
+                Class<?> target = Class.forName(annotationMetadata.getClassName());
+                InvocationHandler invocationHandler = createInvocationHandler();
+                Object proxy = Proxy.newProxyInstance(HTTPRequest.class.getClassLoader(), new Class[]{target}, invocationHandler);
+                return proxy;
+            } catch (ClassNotFoundException e) {
+                log.error(e.getMessage());
+            }
+            return null;
+        }   
+    
+        ...
+     
     }
     ```
 
-2. 编写注解，并在其中使用@Import导入第1步编写的**HTTPRequestRegistrar**。
+2. 编写注解，并在其中使用`@Import`导入第1步编写的 `AutoRequestProxyRegistrar`。
     
     ```java
     @Retention(RetentionPolicy.RUNTIME)
     @Target(ElementType.TYPE)
     @Import(HTTPRequestRegistrar.class)
-    public @interface EnableHttpUtil {
+    public @interface EnableAutoRequestProxy {
     }
     ```
 
-3. 将@EnableHttpUtil添加到@Configuration注解下，如果使用了Spring-Boot，由于@SpringBootApplication注解包含了@Configuration注解，可以将@EnableHttpUtil添加到@SpringBootApplication注解下。
+3. 将`@EnableAutoRequestProxy`添加到`@Configuration`注解下
+   
+   > 如果使用了Spring-Boot，由于`@SpringBootApplication`注解包含了`@Configuration`注解，可以将`@EnableAutoRequestProxy`添加到`@SpringBootApplication`注解下。
     
     ```java
     @SpringBootApplication
     @EnableHttpUtil
-    public class RegisterbeanImportBeanDefinitionRegistrarApplication {
-        
-        public static void main(String[] args) {
-            
+    public class RegistrarBeanImportBeanDefinitionRegistrarApplication {   
+        public static void main(String[] args) {   
             SpringApplication.run(RegisterbeanImportBeanDefinitionRegistrarApplication.class, args);
         }
     }
     ```
 
-4. 使用，直接注入**IRequestDemo**即可
+4. 使用，直接注入 `IRequestDemo` 即可
     
     ```java
     @RunWith(SpringRunner.class)
     @SpringBootTest
     @Slf4j
-    public class RegisterbeanImportBeanDefinitionRegistrarApplicationTests {
+    public class RegistrarBeanImportBeanDefinitionRegistrarApplicationTests {
        @Autowired
        IRequestDemo iRequestDemo;
     
@@ -204,12 +189,4 @@ Spring官方在动态注册bean时，大部分套路其实是使用**`ImportBean
     
     }
     ```
-
-
-完整可以运行demo代码在[https://github.com/pkpk1234/registerbean-ImportBeanDefinitionRegistrar](http://link.zhihu.com/?target=https%3A//github.com/pkpk1234/registerbean-ImportBeanDefinitionRegistrar)
-
-[1]: [Spring动态注册bean](https://zhuanlan.zhihu.com/p/30070328)
-
-[2]: [知乎用户](https://www.zhihu.com/people/xiaofengqing/activities)
-
-[3]: [编写简陋的接口调用框架 - 动态代理学习](https://zhuanlan.zhihu.com/p/29348799)
+    

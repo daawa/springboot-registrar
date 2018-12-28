@@ -28,7 +28,7 @@ import java.lang.reflect.Proxy;
 import java.util.Set;
 
 /**
- * 用于动态注册HTTPUtil接口的实现类
+ * dynamically register beans for interfaces that annotated by @AutoReqProxy
  */
 @Slf4j
 public class AutoRequestProxyRegistrar implements ImportBeanDefinitionRegistrar,
@@ -51,12 +51,14 @@ public class AutoRequestProxyRegistrar implements ImportBeanDefinitionRegistrar,
     private void registerHttpRequest(BeanDefinitionRegistry beanDefinitionRegistry) {
         ClassPathScanningCandidateComponentProvider classScanner = getClassScanner();
         classScanner.setResourceLoader(this.resourceLoader);
-        //指定只关注标注了@HTTPUtil注解的接口
+
+        //指定只关注标注了 @AutoReqProxy 注解的接口
         AnnotationTypeFilter annotationTypeFilter = new AnnotationTypeFilter(AutoReqProxy.class);
+
         classScanner.addIncludeFilter(annotationTypeFilter);
-        //指定扫描的基础包
         String basePack = "com.registrar.demo";
         Set<BeanDefinition> beanDefinitionSet = classScanner.findCandidateComponents(basePack);
+
         for (BeanDefinition beanDefinition : beanDefinitionSet) {
             if (beanDefinition instanceof AnnotatedBeanDefinition) {
                 registerBeans(((AnnotatedBeanDefinition) beanDefinition));

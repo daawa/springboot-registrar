@@ -8,6 +8,12 @@ import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.junit4.SpringRunner;
+
+import java.io.IOException;
+import java.net.URL;
+import java.util.Enumeration;
+import java.util.Optional;
+
 import static org.junit.Assert.*;
 
 
@@ -24,6 +30,15 @@ public class RegistrarBeanImportBeanDefinitionRegistrarApplicationTests {
         String response = result.getResponse();
         log.info(">>>>>>>>>>{}", response);
         assertEquals("http request: url=http://abc.com and method=GET",response);
+
+        try {
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            Enumeration<URL> urls = cl.getResources("META-INF/spring.provides");
+            String res = Optional.ofNullable(urls).filter(Enumeration::hasMoreElements).map(Enumeration::nextElement).map(URL::toString).orElse("res empty.");
+            log.info("res url:" + res);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     @Test
