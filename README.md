@@ -10,17 +10,17 @@
 
 ### ImportBeanDefinitionRegistrar
 
-Spring官方在动态注册bean时，大部分套路其实是使用**`ImportBeanDefinitionRegistrar`**接口。
+Spring官方在动态注册bean时，大部分套路其实是使用 **`ImportBeanDefinitionRegistrar`** 接口。
 
-所有实现了该接口的类的都会被**`ConfigurationClassPostProcessor`**处理，
+所有实现了该接口的类的都会被 **`ConfigurationClassPostProcessor`** 处理，
 
-`ConfigurationClassPostProcessor`实现了**`BeanFactoryPostProcessor`**接口，
+`ConfigurationClassPostProcessor` 实现了 **`BeanFactoryPostProcessor`** 接口，
 
-所以`ImportBeanDefinitionRegistrar`中**动态注册的bean是优先于对其有依赖的bean初始化的**，也能被aop、validator等机制处理。
+所以`ImportBeanDefinitionRegistrar`中 **动态注册的bean是优先于对其有依赖的bean初始化的**，也能被aop、validator等机制处理。
 
 ##### 使用方法
 
-**`ImportBeanDefinitionRegistrar`**需要配合`@Configuration`和`@Import`注解，
+**`ImportBeanDefinitionRegistrar`** 需要配合`@Configuration`和`@Import`注解，
 
 `@Configuration` 定义Java格式的Spring配置文件，
 
@@ -46,9 +46,10 @@ ref: [https://github.com/xwjie/MyRestUtil](http://link.zhihu.com/?target=https%3
 
 ##### 例子编写步骤
 
-1. 首先编写核心**ImportBeanDefinitionRegistrar**接口，重要代码如下：
+1. 首先编写核心 `ImportBeanDefinitionRegistrar` 接口，重要代码如下：
     
-    主要思路是利用**`ClassPathScanningCandidateComponentProvider`**获取标注了**`@AutoReqProxy`**注解的接口，并使用 ***JDK动态代理*** 为其生成代理对象。
+    主要思路是利用 **`ClassPathScanningCandidateComponentProvider`** 获取标注了 **`@AutoReqProxy`** 注解的接口，
+    并使用 ***JDK动态代理*** 为其生成代理对象。
     
     然后使用**`DefaultListableBeanFactory`**将代理对象注册到容器中。
     
@@ -149,7 +150,8 @@ ref: [https://github.com/xwjie/MyRestUtil](http://link.zhihu.com/?target=https%3
 
 3. 将`@EnableAutoRequestProxy`添加到`@Configuration`注解下
    
-   > 如果使用了Spring-Boot，由于`@SpringBootApplication`注解包含了`@Configuration`注解，可以将`@EnableAutoRequestProxy`添加到`@SpringBootApplication`注解下。
+   > 如果使用了Spring-Boot，由于`@SpringBootApplication`注解包含了`@Configuration`注解，
+   > 可以将`@EnableAutoRequestProxy`添加到`@SpringBootApplication`注解下。
     
     ```java
     @SpringBootApplication
